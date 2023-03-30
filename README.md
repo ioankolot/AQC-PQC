@@ -16,11 +16,7 @@ pip install -r requirements.txt
 
 quantum_circuit.py -- This file constructs the parameterized quantum circuit. The single qubit gates, entanglement gates, layers and connectivity should change from main.py.
 
-hamiltonian.py -- This file constructs the 2^n x 2^n (n=Number of Qubits) representation of the Hamiltonian. The implementation includes the Hamiltonian of the following problems:
-
-Classical Optimization Problems: MaxCut, Number Partitioning (more problems to be added soon!)
-Quantum Spin-Configuration Problems: Transverse-Field Ising Chain Model
-
+hamiltonian.py -- This file constructs the 2^n x 2^n (n=Number of Qubits) representation of the Hamiltonian. The implementation includes the Hamiltonian for the MaxCut and Number Partitioning problems (classical combinatorial optimization problems) and the Transverse-Field Ising Chain Model (quantum spin-configuration problem).
 
 aqc_qpc.py -- This file contains the implementation of the AQC-PQC algorithm. 
 
