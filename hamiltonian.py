@@ -50,11 +50,44 @@ class Hamiltonian():
                         if adjacency_matrix[vertex1, vertex2] != 0:
                             Hamiltonian += 1/2*adjacency_matrix[vertex1, vertex2]*self.tensor_pauli(vertex1, self.pauliz)@self.tensor_pauli(vertex2, self.pauliz)
 
-        elif self.problem == 'NumberPartitioning':
+        elif self.problem_type == 'NumberPartitioning':
             numbers_list = self.problem_properties
-            pass
+            for qubit1 in range(self.number_of_qubits):
+                for qubit2 in range(self.number_of_qubits):
+                    if qubit1<qubit2:
+                        Hamiltonian += 2*numbers_list[qubit1]*numbers_list[qubit2]*self.tensor_pauli(qubit1, self.pauliz)@self.tensor_pauli(qubit2, self.pauliz)
 
-        elif self.problem == 'TFIC':
-            pass
+
+        elif self.problem_type == 'TFIC':
+            jays, h = self.problem_properties[0], self.problem_properties[1]
+
+            for qubit in range(self.number_of_qubits-1):
+                Hamiltonian -= jays[qubit]*self.tensor_pauli(qubit, self.pauliz)@self.tensor_pauli(qubit+1, self.pauliz)
+            Hamiltonian -= jays[self.number_of_qubits-1]*self.tensor_pauli(self.number_of_qubits-1, self.pauliz)@ self.tensor_pauli(0, self.pauliz)
+            
+            for qubit in range(self.number_of_qubits):
+                Hamiltonian -= h*self.tensor_pauli(qubit, self.paulix)
+
 
         return Hamiltonian
+    
+    def get_offset(self):
+        offset = 0
+
+
+        if self.problem_type == 'MaxCut':
+
+            adjacency_matrix = self.problem_properties
+            for i in range(self.number_of_qubits):
+                for j in range(self.number_of_qubits):
+                    if i<j:
+                        offset += adjacency_matrix[i,j]/2
+
+        elif self.problem_type == 'NumberPartitioning':
+            
+            numbers_list = self.problem_properties
+            for num in numbers_list:
+                offset += num**2
+
+        return offset
+
