@@ -1,7 +1,6 @@
 import numpy as np
 
 
-
 class Hamiltonian():
 
     def __init__(self, number_of_qubits, problem):
