@@ -12,7 +12,7 @@ so that at the end of the algorithm, the quantum mechanical system will reach th
 ## Installation
 pip install -r requirements.txt
 
-## Details
+## Instructions
 
 quantum_circuit.py -- This file constructs the parameterized quantum circuit. The single qubit gates, entanglement gates, layers and connectivity should change from main.py.
 
