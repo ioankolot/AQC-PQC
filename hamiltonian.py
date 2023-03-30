@@ -51,6 +51,7 @@ class Hamiltonian():
                             Hamiltonian += 1/2*adjacency_matrix[vertex1, vertex2]*self.tensor_pauli(vertex1, self.pauliz)@self.tensor_pauli(vertex2, self.pauliz)
 
         elif self.problem == 'NumberPartitioning':
+            numbers_list = self.problem_properties
             pass
 
         elif self.problem == 'TFIC':
