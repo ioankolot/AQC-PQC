@@ -1,6 +1,6 @@
 # AQC-PQC
 Qiskit implementation of the paper "Adiabatic quantum computing with parameterized quantum circuits" (arXiv:2206.04373)
-Authors: Ioannis Kolotouros, Ioannis Petrongonas, Milos Prokop, Petros Wallden
+Authors: Ioannis Kolotouros, Ioannis Petrongonas, Miloš Prokop, Petros Wallden
 
 ## Description
 AQC-PQC is a hybrid quantum/classical algorithm that can run on near-term quantum devices. The algorithm starts by employing a parameterized quantum circuit and initializing the parameters so that they produce the ground state of a known Hamiltonian. Then, at each step, a small perturbation is added in the Hamiltonian and a (constained) system of linear equations is formed by calculating a series of observables on the unperturbed system. The solution of the (constrained) linear system is the shift vector that will translate the quantum mechanical system to the ground state of the perturbed system. By introducing perturbations at each step, the system iteratively hops between ground states so that at the end of the algorithm it will reach the ground state of the target Hamiltonian.
