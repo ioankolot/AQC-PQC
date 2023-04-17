@@ -6,12 +6,12 @@ from brute_force import Brute_Force
 
 
 seed = 2
-number_of_qubits = 6
+number_of_qubits = 4
 steps = 30 #Choose number of steps to interpolate from initial to final Hamiltonian
 connectivity = 'nearest-neighbors' #This is the connectivity of the non-parameterized gates in the Hardware Efficient ansatz
 single_qubit_gates = 'ry'
 entanglement_gates = 'cz'
-layers = 1
+layers = 2
 entanglement = 'linear'
 
 graph = nx.random_regular_graph(3, number_of_qubits, seed=seed)
