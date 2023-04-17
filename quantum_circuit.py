@@ -17,7 +17,7 @@ class QCir():
 
         self.qcir += TwoLocal(num_qubits = number_of_qubits, rotation_blocks = single_qubit_gates, entanglement_blocks = entanglement_gates, reps = layers, entanglement=entanglement)
         self.number_of_parameters = self.qcir.num_parameters 
-
+        #print(self.number_of_parameters)
 
         if thetas == 'initial':
             thetas = self.get_initial_parameters()
@@ -25,16 +25,19 @@ class QCir():
         self.qcir = self.qcir.assign_parameters(thetas)
 
 
+
     def get_initial_parameters(self):
 
         initial_parameters = []
 
-        if self.single_qubit_gates == 'ry' and self.entanglement_gates == 'cz' and self.layers == 1:
-            for qubit in range(self.number_of_qubits):
+        if self.single_qubit_gates == 'ry' and self.entanglement_gates == 'cz':
+            for qubit in range(self.number_of_qubits*(self.layers)):
                 initial_parameters.append(0)
 
             for qubit in range(self.number_of_qubits):
                 initial_parameters.append(np.pi/2)
+
+        
 
         return initial_parameters 
     

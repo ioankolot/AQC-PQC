@@ -24,6 +24,7 @@ class AQC_PQC():
 
         self.initial_parameters = qcir.get_initial_parameters()
         self.number_of_parameters = len(self.initial_parameters)
+        print(self.number_of_parameters)
 
         hamiltonians = Hamiltonian(self.number_of_qubits, self.problem)
 
@@ -146,7 +147,7 @@ class AQC_PQC():
 
         initial_hessian = self.get_hessian_matrix(self.initial_hamiltonian, optimal_thetas) 
         w, v = np.linalg.eig(initial_hessian)
-        print(f'The eigenvalues of the initial Hessian are {np.round(w,5)}')
+        print(f'The eigenvalues of the initial Hessian are {np.round(w, 7)}')
 
         for lamda in lambdas:
             print('\n')
