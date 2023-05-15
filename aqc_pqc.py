@@ -7,7 +7,6 @@ from hamiltonian import Hamiltonian
 from quantum_circuit import QCir
 from qiskit.quantum_info import Statevector
 
-#is constructing the circuit and assigning parameters harder than running the circuit all the time
 
 class AQC_PQC():
     def __init__(self, number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_third_derivatives = 'No'):
@@ -24,10 +23,10 @@ class AQC_PQC():
 
         self.initial_parameters = qcir.get_initial_parameters()
         self.number_of_parameters = len(self.initial_parameters)
-        print(self.number_of_parameters)
 
         hamiltonians = Hamiltonian(self.number_of_qubits, self.problem)
 
+        self.offset = hamiltonians.get_offset()
         self.initial_hamiltonian = hamiltonians.construct_initial_hamiltonian()
         self.target_hamiltonian = hamiltonians.construct_problem_hamiltonian()
 
@@ -81,7 +80,19 @@ class AQC_PQC():
                     hessian[parameter1, parameter1] -= self.get_expectation_value(angles, observable)/2
 
         return hessian
+
     
+    def get_derivative(self, observable, which_parameter, parameters):
+
+        derivative = 0
+        parameters_plus, parameters_minus = parameters.copy(), parameters.copy()
+        parameters_plus[which_parameter] += np.pi
+        parameters_minus[which_parameter] -= np.pi
+
+        derivative += 1/2*self.get_expectation_value(parameters_plus, observable)
+        derivative -= 1/2*self.get_expectation_value(parameters_minus, observable)
+
+        return derivative
 
     def get_instantaneous_hamiltonian(self, time):
         return (1-time)*self.initial_hamiltonian + time*self.target_hamiltonian
@@ -93,40 +104,9 @@ class AQC_PQC():
 
         #We start with zero order terms.
         for parameter in range(self.number_of_parameters):
+            zero_order_terms[parameter] += self.get_derivative(hamiltonian, parameter, angles)
 
-            zero_order_thetas_1, zero_order_thetas_2 = angles.copy(), angles.copy()
-            zero_order_thetas_1[parameter] += np.pi/2
-            zero_order_thetas_2[parameter] -= np.pi/2
-
-
-            zero_order_terms[parameter] += 1/2*self.get_expectation_value(zero_order_thetas_1, hamiltonian)
-            zero_order_terms[parameter] -= 1/2*self.get_expectation_value(zero_order_thetas_2, hamiltonian)
-
-        #Next we continue with first order terms.
-        for parameter1 in range(self.number_of_parameters):
-            for parameter2 in range(self.number_of_parameters):
-                if parameter1 <= parameter2:
-                
-                    first_order_thetas_1, first_order_thetas_2, first_order_thetas_3, first_order_thetas_4 = angles.copy(), angles.copy(), angles.copy(), angles.copy()
-
-                    first_order_thetas_1[parameter1] += np.pi/2
-                    first_order_thetas_1[parameter2] += np.pi/2
-
-                    first_order_thetas_2[parameter1] += np.pi/2
-                    first_order_thetas_2[parameter2] -= np.pi/2
-
-                    first_order_thetas_3[parameter1] -= np.pi/2
-                    first_order_thetas_3[parameter2] += np.pi/2
-
-                    first_order_thetas_4[parameter1] -= np.pi/2
-                    first_order_thetas_4[parameter2] -= np.pi/2
-
-                    first_order_terms[parameter1, parameter2] += self.get_expectation_value(first_order_thetas_1, hamiltonian)/4
-                    first_order_terms[parameter1, parameter2] -= self.get_expectation_value(first_order_thetas_2, hamiltonian)/4
-                    first_order_terms[parameter1, parameter2] -= self.get_expectation_value(first_order_thetas_3, hamiltonian)/4
-                    first_order_terms[parameter1, parameter2] += self.get_expectation_value(first_order_thetas_4, hamiltonian)/4
-
-                    first_order_terms[parameter2, parameter1] = first_order_terms[parameter1, parameter2]
+        first_order_terms = self.get_hessian_matrix(hamiltonian, angles)
 
         return np.array(zero_order_terms), np.array(first_order_terms)
     
@@ -155,7 +135,6 @@ class AQC_PQC():
             hamiltonian = self.get_instantaneous_hamiltonian(lamda)
             zero, first = self.get_linear_system(hamiltonian, optimal_thetas)
 
-
             def equations(x):
                 array = np.array([x[_] for _ in range(self.number_of_parameters)])
                 equations = zero + first@array
@@ -169,7 +148,7 @@ class AQC_PQC():
                 return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
 
             cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-            res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': True, 'maxiter':700}) 
+            res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='SLSQP',  options={'disp': True, 'maxiter':700}) 
             epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
             
             
@@ -180,7 +159,7 @@ class AQC_PQC():
             min_eigen = self.minimum_eigenvalue(hessian)
 
 
-            inst_exp_value = self.get_expectation_value(optimal_thetas, hamiltonian) #- lamda*offset
+            inst_exp_value = self.get_expectation_value(optimal_thetas, hamiltonian) - lamda*self.offset
             energies_aqcpqc.append(inst_exp_value)
 
             print(f'and the minimum eigenvalue of the Hessian at the solution is {min_eigen}')
