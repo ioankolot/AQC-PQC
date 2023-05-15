@@ -11,7 +11,7 @@ steps = 30 #Choose number of steps to interpolate from initial to final Hamilton
 connectivity = 'nearest-neighbors' #This is the connectivity of the non-parameterized gates in the Hardware Efficient ansatz
 single_qubit_gates = 'ry'
 entanglement_gates = 'cz'
-layers = 2
+layers = 1
 entanglement = 'linear'
 
 graph = nx.random_regular_graph(3, number_of_qubits, seed=seed)
