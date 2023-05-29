@@ -6,10 +6,11 @@ import collections
 from hamiltonian import Hamiltonian
 from quantum_circuit import QCir
 from qiskit.quantum_info import Statevector
+from sympy import Matrix
 
 
 class AQC_PQC():
-    def __init__(self, number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_third_derivatives = 'No'):
+    def __init__(self, number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_third_derivatives = False, use_null_space = False):
 
         self.number_of_qubits = number_of_qubits
         self.problem = problem
@@ -18,6 +19,7 @@ class AQC_PQC():
         self.single_qubit_gates = single_qubit_gates
         self.entanglement_gates = entanglement_gates
         self.entanglement = entanglement
+        self.use_null_space = use_null_space
 
         qcir = QCir(self.number_of_qubits, 'initial', self.layers, self.single_qubit_gates, self.entanglement_gates, self.entanglement)
 
@@ -110,6 +112,14 @@ class AQC_PQC():
 
         return np.array(zero_order_terms), np.array(first_order_terms)
     
+    def find_indices(self, s, threshold=0.1):
+        indices = []
+        for k in range(self.number_of_parameters):
+            if s[k] <= threshold:
+                indices.append(k)
+
+        return indices
+    
     def minimum_eigenvalue(self, matrix):
 
         eigenvalues, eigenvectors = np.linalg.eig(matrix)
@@ -142,18 +152,60 @@ class AQC_PQC():
                 y = np.array([equations[_] for _ in range(self.number_of_parameters)])
                 return y@y
 
+            if not self.use_null_space:
 
-            def minim_eig_constraint(x):
-                new_thetas = [optimal_thetas[i] + x[i] for i in range(self.number_of_parameters)]
-                return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
+                def minim_eig_constraint(x):
+                    new_thetas = [optimal_thetas[i] + x[i] for i in range(self.number_of_parameters)]
+                    return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
 
-            cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-            res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='SLSQP',  options={'disp': True, 'maxiter':700}) 
-            epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
-            
-            
-            print(f'The solutions of equations are {epsilons}')
-            optimal_thetas = [optimal_thetas[_] + epsilons[_] for _ in range(self.number_of_parameters)]
+                cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
+                res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': True, 'maxiter':700}) 
+                epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
+                
+                
+                print(f'The solutions of equations are {epsilons}')
+                optimal_thetas = [optimal_thetas[_] + epsilons[_] for _ in range(self.number_of_parameters)]
+
+
+
+            else:
+
+                u, s, v = np.linalg.svd(first)
+                indices = self.find_indices(s)
+                print(f'The singular values of matrix A are {s}')
+
+                null_space_approx = [v[index] for index in indices]
+
+
+                unconstrained_optimization = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], method='SLSQP',  options={'disp': True, 'maxiter':700})
+                epsilons_0 = unconstrained_optimization.x
+
+                print(f'A solution to the linear system of equations is {epsilons_0}')
+                optimal_thetas = [optimal_thetas[i] + epsilons_0[i] for i in range(self.number_of_parameters)]
+
+                def norm(x):
+                    vector = epsilons_0.copy()
+                    for _ in range(len(null_space_approx)):
+                        vector += x[_]*null_space_approx[_]
+
+                    norm = np.linalg.norm(vector)
+                    print(f'Norm: {norm}')
+                    return norm
+                
+                def minim_eig_constraint(x):
+                    new_thetas = optimal_thetas.copy()
+                    for _ in range(len(null_space_approx)):
+                        new_thetas += x[_]*null_space_approx[_]
+                    return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
+                
+
+                cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
+
+                constrained_optimization = optimize.minimize(norm, x0=[0 for _ in range(len(null_space_approx))], constraints=cons, method='COBYLA', options={'disp':True, 'maxiter':400}) 
+                print(f'The solutions of the second optimization are {constrained_optimization.x}')
+
+                for _ in range(len(null_space_approx)):
+                    optimal_thetas += constrained_optimization.x[_]*null_space_approx[_]
 
             hessian = self.get_hessian_matrix(hamiltonian, optimal_thetas)
             min_eigen = self.minimum_eigenvalue(hessian)
@@ -163,7 +215,7 @@ class AQC_PQC():
             energies_aqcpqc.append(inst_exp_value)
 
             print(f'and the minimum eigenvalue of the Hessian at the solution is {min_eigen}')
-            print(f'and the instantaneous expectation values is {inst_exp_value}')
+            print(f'and the instantaneous expectation values is {inst_exp_value}') 
 
         return energies_aqcpqc
 
