@@ -10,7 +10,7 @@ from sympy import Matrix
 
 
 class AQC_PQC():
-    def __init__(self, number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_third_derivatives = False, use_null_space = False):
+    def __init__(self, number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_third_derivatives = False, use_null_space = False, use_null_derivatives = False):
 
         self.number_of_qubits = number_of_qubits
         self.problem = problem
@@ -20,6 +20,7 @@ class AQC_PQC():
         self.entanglement_gates = entanglement_gates
         self.entanglement = entanglement
         self.use_null_space = use_null_space
+        self.use_null_derivatives = use_null_derivatives
 
         qcir = QCir(self.number_of_qubits, 'initial', self.layers, self.single_qubit_gates, self.entanglement_gates, self.entanglement)
 
@@ -99,7 +100,7 @@ class AQC_PQC():
     def get_instantaneous_hamiltonian(self, time):
         return (1-time)*self.initial_hamiltonian + time*self.target_hamiltonian
     
-    def get_linear_system(self, hamiltonian, angles): #Construct function get_derivatives() and replace zero order terms. Also replace below with get_hessian
+    def get_linear_system(self, hamiltonian, angles):
 
         zero_order_terms = np.zeros((self.number_of_parameters,))
         first_order_terms = np.zeros((self.number_of_parameters, self.number_of_parameters))
@@ -120,11 +121,55 @@ class AQC_PQC():
 
         return indices
     
+    def get_directional_diretivative(self, observable, vector, parameters, h=0.001):
+        
+        #print(f'The parameters are {parameters}')
+        shifted_parameters = [parameters[i] + h*vector[i] for i in range(self.number_of_parameters)]
+        #print(f'The shifted parameters are {shifted_parameters}')
+
+        exp_value1, exp_value2 = self.get_expectation_value(shifted_parameters, observable), self.get_expectation_value(parameters, observable)
+        directional_derivative = (exp_value1 - exp_value2)/h
+
+        return directional_derivative
+    
+    def get_hessian_elements_directional_derivative(self, hessian, vector, parameters, hamiltonian, h=0.0001):
+        
+        hessian_shifted = self.get_hessian_matrix(hamiltonian,  [parameters[i] + h*vector[i] for i in range(self.number_of_parameters)])
+
+        hessian_elements_dir_dervs = (hessian_shifted - hessian)/h
+        return hessian_elements_dir_dervs
+    
+    def get_hessian_from_null_vectors(self, hessian, hessian_elements_dir_derivs, coefs):
+
+        hessian_matrix = hessian.copy()
+        for _ in range(len(coefs)):
+            hessian_matrix += coefs[_]*hessian_elements_dir_derivs[_]
+
+        return hessian_matrix
+
+    def directional_derivative_minimum_eigenvalue_of_hessian(self, hessian, vector, parameters, hamiltonian, h=0.0001):
+
+        hessian_shifted = self.get_hessian_matrix(hamiltonian,  [parameters[i] + h*vector[i] for i in range(self.number_of_parameters)])
+
+        min_eig_shifted, min_eig_at_point = self.minimum_eigenvalue(hessian_shifted), self.minimum_eigenvalue(hessian)
+
+        return (min_eig_shifted-min_eig_at_point)/h
+    
+    def derivative_of_minimum_eigenvalue_over_lamda(self, hessian, time, parameters, q=0.001): #This function quantifies how much the perturbation affects the minimum eigenvalue.
+
+        hamiltonian_perturbed = self.get_instantaneous_hamiltonian(time+q)
+        hessian_perturbed = self.get_hessian_matrix(hamiltonian_perturbed, parameters)
+        min_eig_unperturbed, min_eig_perturbed = self.minimum_eigenvalue(hessian), self.minimum_eigenvalue(hessian_perturbed)
+
+        return (min_eig_perturbed-min_eig_unperturbed)/q
+
+
+
     def minimum_eigenvalue(self, matrix):
 
         eigenvalues, eigenvectors = np.linalg.eig(matrix)
         min_eigen = np.min(eigenvalues)
-        print(min_eigen)
+        #print(min_eigen)
         return min_eigen
 
     def run(self):
@@ -141,7 +186,7 @@ class AQC_PQC():
 
         for lamda in lambdas:
             print('\n')
-            print(f'We are working on {lamda}')
+            print(f'We are working on {lamda} where the current optimal point is {optimal_thetas}')
             hamiltonian = self.get_instantaneous_hamiltonian(lamda)
             zero, first = self.get_linear_system(hamiltonian, optimal_thetas)
 
@@ -151,7 +196,7 @@ class AQC_PQC():
 
                 y = np.array([equations[_] for _ in range(self.number_of_parameters)])
                 return y@y
-
+            
             if not self.use_null_space:
 
                 def minim_eig_constraint(x):
@@ -159,13 +204,12 @@ class AQC_PQC():
                     return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
 
                 cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-                res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': True, 'maxiter':700}) 
+                res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': False}) 
                 epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
                 
                 
                 print(f'The solutions of equations are {epsilons}')
                 optimal_thetas = [optimal_thetas[_] + epsilons[_] for _ in range(self.number_of_parameters)]
-
 
 
             else:
@@ -177,11 +221,12 @@ class AQC_PQC():
                 null_space_approx = [v[index] for index in indices]
 
 
-                unconstrained_optimization = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], method='SLSQP',  options={'disp': True, 'maxiter':700})
+                unconstrained_optimization = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], method='SLSQP',  options={'disp': False})
                 epsilons_0 = unconstrained_optimization.x
 
                 print(f'A solution to the linear system of equations is {epsilons_0}')
                 optimal_thetas = [optimal_thetas[i] + epsilons_0[i] for i in range(self.number_of_parameters)]
+
 
                 def norm(x):
                     vector = epsilons_0.copy()
@@ -189,23 +234,45 @@ class AQC_PQC():
                         vector += x[_]*null_space_approx[_]
 
                     norm = np.linalg.norm(vector)
-                    print(f'Norm: {norm}')
+                    #print(f'Norm: {norm}')
                     return norm
                 
-                def minim_eig_constraint(x):
-                    new_thetas = optimal_thetas.copy()
-                    for _ in range(len(null_space_approx)):
-                        new_thetas += x[_]*null_space_approx[_]
-                    return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
+                if not self.use_null_derivatives:
+
+                    def minim_eig_constraint(x):
+                        new_thetas = optimal_thetas.copy()
+                        for _ in range(len(null_space_approx)):
+                            new_thetas += x[_]*null_space_approx[_]
+                        return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
+                    
+
+                else:
                 
+                    #We can further make use that the null vectors are small! We construct a linear model of the Hessian using the directional derivatives of the Hessian elements, at the directional of the null vectors.
+                    #First of all, we calculate the Hessian of the perturbed Hamiltonian at the previous optimal.
+                    perturbed_hessian_at_optimal = self.get_hessian_matrix(hamiltonian, optimal_thetas)
 
+
+                    #Then, we find the directional derivatives of the hessian elements at the optimal point.
+                    directional_derivs_of_hessian_elements = []
+                    for _ in range(len(null_space_approx)):
+                        directional_derivs_of_hessian_elements.append(self.get_hessian_elements_directional_derivative(perturbed_hessian_at_optimal, null_space_approx[_], optimal_thetas, hamiltonian))
+
+
+                    #Once we have the directional derivatives of the matrix elements, we can further proceed and impose the new minimum_eigenvalue constraint.
+
+                    def minim_eig_constraint(x):
+                        return self.minimum_eigenvalue(self.get_hessian_from_null_vectors(perturbed_hessian_at_optimal, directional_derivs_of_hessian_elements, x))
+
+                
+                
                 cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-
                 constrained_optimization = optimize.minimize(norm, x0=[0 for _ in range(len(null_space_approx))], constraints=cons, method='COBYLA', options={'disp':True, 'maxiter':400}) 
                 print(f'The solutions of the second optimization are {constrained_optimization.x}')
 
                 for _ in range(len(null_space_approx)):
                     optimal_thetas += constrained_optimization.x[_]*null_space_approx[_]
+
 
             hessian = self.get_hessian_matrix(hamiltonian, optimal_thetas)
             min_eigen = self.minimum_eigenvalue(hessian)
@@ -216,6 +283,8 @@ class AQC_PQC():
 
             print(f'and the minimum eigenvalue of the Hessian at the solution is {min_eigen}')
             print(f'and the instantaneous expectation values is {inst_exp_value}') 
+
+            print(f'The derivative of the minimum eigenvalue over lambda is {self.derivative_of_minimum_eigenvalue_over_lamda(hessian, lamda, optimal_thetas)}')
 
         return energies_aqcpqc
 
