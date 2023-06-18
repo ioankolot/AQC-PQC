@@ -36,7 +36,7 @@ class Hamiltonian():
 
         return initial_Hamiltonian
 
-    def construct_problem_hamiltonian(self): #I could put problem as a dictionary problem = {'type' = MaxCut, [list_of_things_to_define_problem] = w}
+    def construct_problem_hamiltonian(self):
 
         Hamiltonian = np.zeros((2**self.number_of_qubits, 2**self.number_of_qubits))
 

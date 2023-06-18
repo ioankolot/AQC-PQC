@@ -3,15 +3,18 @@ from hamiltonian import Hamiltonian
 from quantum_circuit import QCir
 import networkx as nx
 from brute_force import Brute_Force
+from qaoa_circuit import QAOA_Circuit
+from aqc_qaoa import AQC_PQC_QAOA
+import numpy as np
 
-
+np.random.seed(0)
 seed = 2
 number_of_qubits = 6
-steps = 100 #Choose number of steps to interpolate from initial to final Hamiltonian
+steps = 150 #Choose number of steps to interpolate from initial to final Hamiltonian
 connectivity = 'nearest-neighbors' #This is the connectivity of the non-parameterized gates in the Hardware Efficient ansatz
 single_qubit_gates = 'ry'
 entanglement_gates = 'cz'
-layers = 1
+layers = 4
 entanglement = 'linear'
 
 graph = nx.random_regular_graph(3, number_of_qubits, seed=seed)
@@ -22,5 +25,7 @@ problem = {'type':'MaxCut', 'properties': w}
 Brute_Force(problem)
 
 
-aqc_pqc = AQC_PQC(number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_null_space=True)
+aqc_pqc = AQC_PQC_QAOA(number_of_qubits, problem, steps, layers, use_null_space=True)
 aqc_pqc.run()
+#aqc_pqc = AQC_PQC(number_of_qubits, problem, steps, layers, single_qubit_gates, entanglement_gates, entanglement, use_null_space=True)
+#aqc_pqc.run()
