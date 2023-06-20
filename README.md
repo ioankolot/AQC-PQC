@@ -18,6 +18,10 @@ aqc_qpc.py -- This file contains the implementation of the AQC-PQC algorithm.
 
 main.py -- This file executes the AQC-PQC algorithm. Circuit architecture, type of problem, instance, #steps should all change from this file.
 
+aqc_qaoa.py -- This file contains the implementation of the AQC-PQC algorithm when the QAOA ansatz is used.
 
+qaoa_circuit.py -- This file contains the quantum circuit for the QAOA ansatz.
+
+brute_force.py -- This file calculates the optimal energy and optimal solutions for any problem tackled (by brute force).
 
 
