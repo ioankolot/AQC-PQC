@@ -41,6 +41,18 @@ class AQC_PQC():
         expectation_value = sv1.expectation_value(observable)
         return np.real(expectation_value)
     
+    def get_derivative(self, observable, which_parameter, parameters):
+
+        derivative = 0
+        parameters_plus, parameters_minus = parameters.copy(), parameters.copy()
+        parameters_plus[which_parameter] += np.pi/2
+        parameters_minus[which_parameter] -= np.pi/2
+
+        derivative += 1/2*self.get_expectation_value(parameters_plus, observable)
+        derivative -= 1/2*self.get_expectation_value(parameters_minus, observable)
+        
+        return derivative
+    
     def get_hessian_matrix(self, observable, angles):
 
         hessian = np.zeros((self.number_of_parameters, self.number_of_parameters))
@@ -84,18 +96,66 @@ class AQC_PQC():
 
         return hessian
 
-    
-    def get_derivative(self, observable, which_parameter, parameters):
+    def get_third_derivatives(self, observable, angles):
+        third_derivatives = np.zeros((self.number_of_parameters, self.number_of_parameters, self.number_of_parameters))
 
-        derivative = 0
-        parameters_plus, parameters_minus = parameters.copy(), parameters.copy()
-        parameters_plus[which_parameter] += np.pi
-        parameters_minus[which_parameter] -= np.pi
+        for parameter1 in range(self.number_of_parameters):
+            for parameter2 in range(self.number_of_parameters):
+                for parameter3 in range(self.number_of_parameters):
 
-        derivative += 1/2*self.get_expectation_value(parameters_plus, observable)
-        derivative -= 1/2*self.get_expectation_value(parameters_minus, observable)
+                    if parameter1<=parameter2 and parameter2<=parameter3:
 
-        return derivative
+                        third_order_thetas1, third_order_thetas2, third_order_thetas3, third_order_thetas4, third_order_thetas5, third_order_thetas6, third_order_thetas7, third_order_thetas8 = angles.copy(), angles.copy(), angles.copy(), angles.copy(), angles.copy(), angles.copy(), angles.copy(), angles.copy()
+
+                        third_order_thetas1[parameter1] += np.pi/2
+                        third_order_thetas1[parameter2] += np.pi/2
+                        third_order_thetas1[parameter3] += np.pi/2
+
+                        third_order_thetas2[parameter1] += np.pi/2
+                        third_order_thetas2[parameter2] += np.pi/2
+                        third_order_thetas2[parameter3] -= np.pi/2
+
+                        third_order_thetas3[parameter1] -= np.pi/2
+                        third_order_thetas3[parameter2] += np.pi/2
+                        third_order_thetas3[parameter3] += np.pi/2
+
+                        third_order_thetas4[parameter1] -= np.pi/2
+                        third_order_thetas4[parameter2] += np.pi/2
+                        third_order_thetas4[parameter3] -= np.pi/2
+
+                        third_order_thetas5[parameter1] += np.pi/2
+                        third_order_thetas5[parameter2] -= np.pi/2
+                        third_order_thetas5[parameter3] += np.pi/2
+
+                        third_order_thetas6[parameter1] += np.pi/2
+                        third_order_thetas6[parameter2] -= np.pi/2
+                        third_order_thetas6[parameter3] -= np.pi/2
+
+                        third_order_thetas7[parameter1] -= np.pi/2
+                        third_order_thetas7[parameter2] -= np.pi/2
+                        third_order_thetas7[parameter3] += np.pi/2
+
+                        third_order_thetas8[parameter1] -= np.pi/2
+                        third_order_thetas8[parameter2] -= np.pi/2
+                        third_order_thetas8[parameter3] -= np.pi/2
+
+                        third_derivatives[parameter1, parameter2, parameter3] += self.get_expectation_value(third_order_thetas1, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] -= self.get_expectation_value(third_order_thetas2, observable)/8  
+                        third_derivatives[parameter1, parameter2, parameter3] -= self.get_expectation_value(third_order_thetas3, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] += self.get_expectation_value(third_order_thetas4, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] -= self.get_expectation_value(third_order_thetas5, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] += self.get_expectation_value(third_order_thetas6, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] += self.get_expectation_value(third_order_thetas7, observable)/8
+                        third_derivatives[parameter1, parameter2, parameter3] -= self.get_expectation_value(third_order_thetas8, observable)/8
+
+                        third_derivatives[parameter1, parameter3, parameter2] = third_derivatives[parameter1, parameter2, parameter3]
+                        third_derivatives[parameter2, parameter1, parameter3] = third_derivatives[parameter1, parameter2, parameter3]
+                        third_derivatives[parameter2, parameter3, parameter1] = third_derivatives[parameter1, parameter2, parameter3]
+                        third_derivatives[parameter3, parameter1, parameter2] = third_derivatives[parameter1, parameter2, parameter3]
+                        third_derivatives[parameter3, parameter2, parameter1] = third_derivatives[parameter1, parameter2, parameter3]
+
+        return np.array(third_derivatives)
+
 
     def get_instantaneous_hamiltonian(self, time):
         return (1-time)*self.initial_hamiltonian + time*self.target_hamiltonian
@@ -123,9 +183,7 @@ class AQC_PQC():
     
     def get_directional_diretivative(self, observable, vector, parameters, h=0.001):
         
-        #print(f'The parameters are {parameters}')
         shifted_parameters = [parameters[i] + h*vector[i] for i in range(self.number_of_parameters)]
-        #print(f'The shifted parameters are {shifted_parameters}')
 
         exp_value1, exp_value2 = self.get_expectation_value(shifted_parameters, observable), self.get_expectation_value(parameters, observable)
         directional_derivative = (exp_value1 - exp_value2)/h
@@ -164,12 +222,27 @@ class AQC_PQC():
         return (min_eig_perturbed-min_eig_unperturbed)/q
 
 
+    def get_hessian_approximation(self, hessian, hamiltonian, gradient, parameters, shift):
+
+        new_angles =  [parameters[_] + shift[_] for _ in range(self.number_of_parameters)]
+        new_gradient = np.array([self.get_derivative(hamiltonian, parameter, new_angles) for parameter in range(self.number_of_parameters)])
+        change_of_gradient = (new_gradient - np.array(gradient)).reshape((self.number_of_parameters, 1))
+        shift = np.array(shift).reshape((self.number_of_parameters, 1))
+
+        term1 = change_of_gradient@change_of_gradient.T
+        term1 /= shift@change_of_gradient.T@shift
+
+        term2 = hessian@shift@shift.T@hessian
+        term2 /= shift.T@hessian@shift
+
+        hessian_approximation = hessian + term1 - term2
+
+        return hessian_approximation
 
     def minimum_eigenvalue(self, matrix):
 
-        eigenvalues, eigenvectors = np.linalg.eig(matrix)
-        min_eigen = np.min(eigenvalues)
-        #print(min_eigen)
+        min_eigen = np.min(np.linalg.eig(matrix)[0])
+        print(min_eigen)
         return min_eigen
 
     def run(self):
@@ -189,6 +262,33 @@ class AQC_PQC():
             print(f'We are working on {lamda} where the current optimal point is {optimal_thetas}')
             hamiltonian = self.get_instantaneous_hamiltonian(lamda)
             zero, first = self.get_linear_system(hamiltonian, optimal_thetas)
+
+
+            
+            random_shift = [np.random.uniform(0, 0.1) for _ in range(self.number_of_parameters)]
+            print(f'Random shift {random_shift}')
+            print('\n')
+
+            new_angles = [optimal_thetas[_] + random_shift[_] for _ in range(self.number_of_parameters)]
+
+            gradient = [self.get_derivative(hamiltonian, parameter, new_angles) for parameter in range(self.number_of_parameters)]
+            print(f'Gradient at random_point {gradient}')
+            print('\n')
+
+
+            exact_hessian = self.get_hessian_matrix(hamiltonian, new_angles)
+            print(f'The first line of the exact hessian at shfit is {exact_hessian[0]}')
+            w = min(np.linalg.eig(exact_hessian)[0])
+            print(f'with minimum eigenvalue {w}')
+
+            print('\n')
+            gradient = [self.get_derivative(hamiltonian, parameter, optimal_thetas) for parameter in range(self.number_of_parameters)]
+            approx_hessian = self.get_hessian_approximation(initial_hessian, hamiltonian, gradient, optimal_thetas, random_shift)
+            print(f'And the Hessian Approximation is {approx_hessian[0]}')
+            w = min(np.linalg.eig(approx_hessian)[0])
+            print(f'with minimum eigenvalue {w}')
+            print(f'and the Frobenius norm (error) is {np.linalg.norm(exact_hessian-approx_hessian)}')   
+
 
             def equations(x):
                 array = np.array([x[_] for _ in range(self.number_of_parameters)])
