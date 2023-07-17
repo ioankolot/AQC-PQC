@@ -222,7 +222,7 @@ class AQC_PQC():
         return (min_eig_perturbed-min_eig_unperturbed)/q
 
 
-    def get_hessian_approximation(self, hessian, hamiltonian, gradient, parameters, shift):
+    def get_hessian_approximation(self, hessian, hamiltonian, gradient, parameters, shift): #need to do the derivation to write the correct change of gradients as well 
 
         new_angles =  [parameters[_] + shift[_] for _ in range(self.number_of_parameters)]
         new_gradient = np.array([self.get_derivative(hamiltonian, parameter, new_angles) for parameter in range(self.number_of_parameters)])
@@ -262,32 +262,7 @@ class AQC_PQC():
             print(f'We are working on {lamda} where the current optimal point is {optimal_thetas}')
             hamiltonian = self.get_instantaneous_hamiltonian(lamda)
             zero, first = self.get_linear_system(hamiltonian, optimal_thetas)
-
-
-            
-            random_shift = [np.random.uniform(0, 0.1) for _ in range(self.number_of_parameters)]
-            print(f'Random shift {random_shift}')
-            print('\n')
-
-            new_angles = [optimal_thetas[_] + random_shift[_] for _ in range(self.number_of_parameters)]
-
-            gradient = [self.get_derivative(hamiltonian, parameter, new_angles) for parameter in range(self.number_of_parameters)]
-            print(f'Gradient at random_point {gradient}')
-            print('\n')
-
-
-            exact_hessian = self.get_hessian_matrix(hamiltonian, new_angles)
-            print(f'The first line of the exact hessian at shfit is {exact_hessian[0]}')
-            w = min(np.linalg.eig(exact_hessian)[0])
-            print(f'with minimum eigenvalue {w}')
-
-            print('\n')
-            gradient = [self.get_derivative(hamiltonian, parameter, optimal_thetas) for parameter in range(self.number_of_parameters)]
-            approx_hessian = self.get_hessian_approximation(initial_hessian, hamiltonian, gradient, optimal_thetas, random_shift)
-            print(f'And the Hessian Approximation is {approx_hessian[0]}')
-            w = min(np.linalg.eig(approx_hessian)[0])
-            print(f'with minimum eigenvalue {w}')
-            print(f'and the Frobenius norm (error) is {np.linalg.norm(exact_hessian-approx_hessian)}')   
+ 
 
 
             def equations(x):
