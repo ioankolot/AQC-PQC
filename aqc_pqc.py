@@ -1,8 +1,6 @@
 from qiskit.visualization import *
 import numpy as np
 import scipy.optimize as optimize
-import networkx as nx
-import collections
 from hamiltonian import Hamiltonian
 from quantum_circuit import QCir
 from qiskit.quantum_info import Statevector
@@ -21,6 +19,7 @@ class AQC_PQC():
         self.entanglement = entanglement
         self.use_null_space = use_null_space
         self.use_null_derivatives = use_null_derivatives
+        self.use_third_derivatives = use_third_derivatives
 
         qcir = QCir(self.number_of_qubits, 'initial', self.layers, self.single_qubit_gates, self.entanglement_gates, self.entanglement)
 
@@ -155,6 +154,16 @@ class AQC_PQC():
                         third_derivatives[parameter3, parameter2, parameter1] = third_derivatives[parameter1, parameter2, parameter3]
 
         return np.array(third_derivatives)
+    
+    
+
+    def get_hessian_third_derivs(self, hessian_at_point, third_order_derivatives, epsilons):
+        hessian_matrix = hessian_at_point.copy()
+
+        for parameter in range(self.number_of_parameters):
+            hessian_matrix += epsilons[parameter]*third_order_derivatives[parameter]
+
+        return hessian_matrix
 
 
     def get_instantaneous_hamiltonian(self, time):
@@ -264,7 +273,6 @@ class AQC_PQC():
             zero, first = self.get_linear_system(hamiltonian, optimal_thetas)
  
 
-
             def equations(x):
                 array = np.array([x[_] for _ in range(self.number_of_parameters)])
                 equations = zero + first@array
@@ -274,14 +282,25 @@ class AQC_PQC():
             
             if not self.use_null_space:
 
-                def minim_eig_constraint(x):
-                    new_thetas = [optimal_thetas[i] + x[i] for i in range(self.number_of_parameters)]
-                    return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
+                if not self.use_third_derivatives or np.all(zero) == 0:
+                    
+                    def minim_eig_constraint(x):
+                        new_thetas = [optimal_thetas[i] + x[i] for i in range(self.number_of_parameters)]
+                        return self.minimum_eigenvalue(self.get_hessian_matrix(hamiltonian, new_thetas))
 
+                else:
+                    
+                    third_derivs = self.get_third_derivatives(hamiltonian, optimal_thetas)
+                    hessian_at_optimal_point = self.get_hessian_matrix(hamiltonian, optimal_thetas)
+            
+                    def minim_eig_constraint(x):
+                        return self.minimum_eigenvalue(self.get_hessian_third_derivs(hessian_at_optimal_point, third_derivs, x))
+                    
+                    
+                    
                 cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
                 res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': False}) 
                 epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
-                
                 
                 print(f'The solutions of equations are {epsilons}')
                 optimal_thetas = [optimal_thetas[_] + epsilons[_] for _ in range(self.number_of_parameters)]
@@ -294,7 +313,6 @@ class AQC_PQC():
                 print(f'The singular values of matrix A are {s}')
 
                 null_space_approx = [v[index] for index in indices]
-
 
                 unconstrained_optimization = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], method='SLSQP',  options={'disp': False})
                 epsilons_0 = unconstrained_optimization.x
@@ -342,7 +360,7 @@ class AQC_PQC():
                 
                 
                 cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-                constrained_optimization = optimize.minimize(norm, x0=[0 for _ in range(len(null_space_approx))], constraints=cons, method='COBYLA', options={'disp':True, 'maxiter':400}) 
+                constrained_optimization = optimize.minimize(norm, x0=[0 for _ in range(len(null_space_approx))], constraints=cons, method='SLSQP', options={'disp':True, 'maxiter':400}) 
                 print(f'The solutions of the second optimization are {constrained_optimization.x}')
 
                 for _ in range(len(null_space_approx)):
@@ -359,7 +377,6 @@ class AQC_PQC():
             print(f'and the minimum eigenvalue of the Hessian at the solution is {min_eigen}')
             print(f'and the instantaneous expectation values is {inst_exp_value}') 
 
-            print(f'The derivative of the minimum eigenvalue over lambda is {self.derivative_of_minimum_eigenvalue_over_lamda(hessian, lamda, optimal_thetas)}')
 
         return energies_aqcpqc
 

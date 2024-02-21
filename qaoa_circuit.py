@@ -18,7 +18,7 @@ class QAOA_Circuit():
 
         self.qcir.h(range(self.number_of_qubits)) #Initialize quantum circuit in the |+> state
 
-        self.qcir += self.get_qaoa_ansatz(self.problem, self.layers, self.betas, self.gammas)
+        self.qcir &= self.get_qaoa_ansatz(self.problem, self.layers, self.betas, self.gammas)
         #self.qcir.draw(output='mpl')
         #plt.show()
         self.number_of_parameters = 2*self.layers

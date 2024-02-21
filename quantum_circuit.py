@@ -19,7 +19,7 @@ class QCir():
         self.gammas = gammas
 
         if not self.use_QAOA:
-            self.qcir += TwoLocal(num_qubits = number_of_qubits, rotation_blocks = single_qubit_gates, entanglement_blocks = entanglement_gates, reps = layers, entanglement=entanglement)
+            self.qcir &= TwoLocal(num_qubits = number_of_qubits, rotation_blocks = single_qubit_gates, entanglement_blocks = entanglement_gates, reps = layers, entanglement=entanglement)
             self.number_of_parameters = self.qcir.num_parameters 
 
             if thetas == 'initial':
