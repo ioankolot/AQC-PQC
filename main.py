@@ -10,7 +10,7 @@ import numpy as np
 np.random.seed(2)
 seed = 3
 number_of_qubits = 4
-steps = 100 #Choose number of steps to interpolate from initial to final Hamiltonian
+steps = 50 #Choose number of steps to interpolate from initial to final Hamiltonian
 connectivity = 'nearest-neighbors' #This is the connectivity of the non-parameterized gates in the Hardware Efficient ansatz
 single_qubit_gates = 'ry'
 entanglement_gates = 'cz'
@@ -28,7 +28,7 @@ Brute_Force(problem)
 #aqc_pqc.run()
 
 aqc_pqc = AQC_PQC(number_of_qubits, problem, steps, layers, single_qubit_gates,
-                  entanglement_gates, entanglement, use_null_space=False, use_third_derivatives=True)
+                  entanglement_gates, entanglement, use_null_space=False, use_third_derivatives=False)
 aqc_pqc.run()
 
 

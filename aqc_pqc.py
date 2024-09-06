@@ -376,7 +376,7 @@ class AQC_PQC():
 
             print(f'and the minimum eigenvalue of the Hessian at the solution is {min_eigen}')
             print(f'and the instantaneous expectation values is {inst_exp_value}') 
-
+            print(f'and the true expectation value is {self.minimum_eigenvalue(hamiltonian) - lamda*self.offset}')
 
         return energies_aqcpqc
 
