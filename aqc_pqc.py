@@ -5,6 +5,10 @@ from hamiltonian import Hamiltonian
 from quantum_circuit import QCir
 from qiskit.quantum_info import Statevector
 from sympy import Matrix
+from qiskit.primitives import Estimator
+from qiskit.circuit.library import TwoLocal
+from qiskit_algorithms.gradients import ParamShiftEstimatorGradient, ReverseEstimatorGradient, ReverseQGT
+from qiskit.circuit import ParameterVector
 
 
 class AQC_PQC():
@@ -26,31 +30,31 @@ class AQC_PQC():
         self.initial_parameters = qcir.get_initial_parameters()
         self.number_of_parameters = len(self.initial_parameters)
 
-        hamiltonians = Hamiltonian(self.number_of_qubits, self.problem)
+        hamiltonians = Hamiltonian(self.problem)
 
-        self.offset = hamiltonians.get_offset()
-        self.initial_hamiltonian = hamiltonians.construct_initial_hamiltonian()
-        self.target_hamiltonian = hamiltonians.construct_problem_hamiltonian()
+        self.target_hamiltonian, self.offset = hamiltonians.get_pauli_operator_and_offset()
+        self.initial_hamiltonian = hamiltonians.get_transverse_hamiltonian(self.number_of_qubits)
 
+        self.qcir = TwoLocal(self.number_of_qubits, self.single_qubit_gates, self.entanglement_gates, self.entanglement, self.layers)
 
-    def get_expectation_value(self, angles, observable):
-        circuit = QCir(self.number_of_qubits, angles, self.layers, self.single_qubit_gates, self.entanglement_gates, self.entanglement)
-        sv1 = Statevector.from_label('0'*self.number_of_qubits)
-        sv1 = sv1.evolve(circuit.qcir)
-        expectation_value = sv1.expectation_value(observable)
+    def get_expectation_value(self, angles, observable, shots = None):
+
+        estimator = Estimator() if not shots else Estimator(options={'shots':shots})
+        expectation_value = estimator.run(self.qcir, observable, angles).result().values[0]
+
         return np.real(expectation_value)
     
-    def get_derivative(self, observable, which_parameter, parameters):
+    
+    
+    def get_derivatives(self, angles, observable, shots=None):
 
-        derivative = 0
-        parameters_plus, parameters_minus = parameters.copy(), parameters.copy()
-        parameters_plus[which_parameter] += np.pi/2
-        parameters_minus[which_parameter] -= np.pi/2
+        estimator = Estimator() if not shots else Estimator(options={'shots':shots})
+        gradient = ParamShiftEstimatorGradient(estimator)
 
-        derivative += 1/2*self.get_expectation_value(parameters_plus, observable)
-        derivative -= 1/2*self.get_expectation_value(parameters_minus, observable)
-        
-        return derivative
+        derivatives = gradient.run(self.qcir, observable, [angles]).result().gradients[0]
+
+        return derivatives
+
     
     def get_hessian_matrix(self, observable, angles):
 
@@ -175,8 +179,7 @@ class AQC_PQC():
         first_order_terms = np.zeros((self.number_of_parameters, self.number_of_parameters))
 
         #We start with zero order terms.
-        for parameter in range(self.number_of_parameters):
-            zero_order_terms[parameter] += self.get_derivative(hamiltonian, parameter, angles)
+        zero_order_terms = self.get_derivatives(angles, hamiltonian)
 
         first_order_terms = self.get_hessian_matrix(hamiltonian, angles)
 
@@ -299,7 +302,7 @@ class AQC_PQC():
                     
                     
                 cons = [{'type': 'ineq', 'fun':minim_eig_constraint}]
-                res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='COBYLA',  options={'disp': False}) 
+                res = optimize.minimize(equations, x0 = [0 for _ in range(self.number_of_parameters)], constraints=cons,  method='SLSQP',  options={'disp': False}) 
                 epsilons = [res.x[_] for _ in range(self.number_of_parameters)]
                 
                 print(f'The solutions of equations are {epsilons}')
