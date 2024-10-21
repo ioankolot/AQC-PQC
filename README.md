@@ -1,5 +1,5 @@
 # AQC-PQC
-Qiskit implementation of the paper "Adiabatic quantum computing with parameterized quantum circuits" (Ioannis Kolotouros et al 2025 Quantum Sci. Technol. 10 015003)
+Qiskit implementation of the paper "Adiabatic quantum computing with parameterized quantum circuits" (Quantum Sci. Technol. 10 015003)
 Authors: Ioannis Kolotouros, Ioannis Petrongonas, Miloš Prokop, Petros Wallden
 
 ## Description
